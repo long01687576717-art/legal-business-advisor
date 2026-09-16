@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-法商结合出海顾问 · Streamlit 网页版 v2（非流式，稳定版）
+法商结合出海顾问 · Streamlit 网页版
 """
 import json
 import requests
@@ -10,7 +10,7 @@ from sentence_transformers import SentenceTransformer
 import streamlit as st
 
 # ============ 路径 ============
-BASE_DIR = Path(r"D:\HuaweiMoveData\Users\重庆森林\Desktop\法商项目")
+BASE_DIR = Path(__file__).parent
 CHROMA_DIR = BASE_DIR / "kb" / "chroma_db"
 EMBED_MODEL_NAME = "BAAI/bge-small-zh-v1.5"
 
@@ -91,7 +91,7 @@ def build_context(deduped):
     return "\n\n".join(parts)
 
 
-# ============ 调用 DeepSeek（非流式） ============
+# ============ 调用 DeepSeek ============
 def call_deepseek(question, context, api_key, model_name):
     user_prompt = f"""请根据下面的参考资料回答问题。
 
@@ -127,8 +127,20 @@ st.set_page_config(page_title="法商结合出海顾问", page_icon="⚖️", la
 
 with st.sidebar:
     st.header("⚙️ 配置")
-    api_key = st.text_input("DeepSeek API Key", type="password",
-                            help="不会被保存，仅本次会话使用")
+
+    # 优先从 Secrets 读，读不到再从侧边栏输入
+    api_key = ""
+    try:
+        api_key = st.secrets.get("DEEPSEEK_API_KEY", "")
+    except Exception:
+        api_key = ""
+
+    if not api_key:
+        api_key = st.text_input("DeepSeek API Key", type="password",
+                                help="不会被保存，仅本次会话使用")
+    else:
+        st.success("API Key 已从云端配置读取")
+
     model_name = st.selectbox("模型", ["deepseek-chat", "deepseek-reasoner"], index=0,
                               help="chat 更快，reasoner 推理更强但更慢、更贵")
     st.divider()
@@ -146,7 +158,6 @@ st.caption("基于长江存储 IPO 申请书 + 出口管制法律文件的知识
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-# 展示历史
 for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
@@ -156,7 +167,6 @@ for msg in st.session_state.messages:
                     st.markdown(f"**{i}. {meta['source']}**（{meta['category']}）  相似度 {sim:.3f}")
                     st.text(doc[:500] + ("..." if len(doc) > 500 else ""))
 
-# 输入
 question = st.chat_input("请输入你的问题...")
 
 if question:
@@ -164,7 +174,6 @@ if question:
         st.error("请先在左侧填写 DeepSeek API Key。")
         st.stop()
 
-    # 先把用户消息存入历史
     st.session_state.messages.append({"role": "user", "content": question})
 
     with st.chat_message("user"):
@@ -190,7 +199,6 @@ if question:
                 st.markdown(f"**{i}. {meta['source']}**（{meta['category']}）  相似度 {sim:.3f}")
                 st.text(doc[:500] + ("..." if len(doc) > 500 else ""))
 
-    # 再存 AI 消息
     st.session_state.messages.append({
         "role": "assistant",
         "content": answer,

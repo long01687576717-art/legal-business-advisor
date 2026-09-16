@@ -4,6 +4,5 @@ venv/
 env/
 .env
 secrets.toml
-kb/
 *.db
 .DS_Store
